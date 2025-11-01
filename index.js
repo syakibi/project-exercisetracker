@@ -27,63 +27,76 @@ const User = mongoose.model('User', userSchema)
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
-});
+})
 
+// Create user
 app.post('/api/users', (req, res) => {
-  const username = req.body.username;
-  const user = new User({ username });
+  const username = req.body.username
+  const user = new User({ username })
   user.save((err, data) => {
-    if(err) return console.error(err);
-    res.json({ username: data.username, _id: data._id });
-  });
-});
+    if (err) return console.error(err)
+    res.json({ username: data.username, _id: data._id })
+  })
+})
 
+// Get all users
+app.get('/api/users', (req, res) => {
+  User.find({}, 'username _id', (err, users) => {
+    if (err) return console.error(err)
+    res.json(users)
+  })
+})
+
+// Add exercise
 app.post('/api/users/:_id/exercises', (req, res) => {
-  const { description, duration, date } = req.body;
+  const { description, duration, date } = req.body
   const exercise = {
-  description,
-  duration: Number(duration),
-  date: date ? new Date(date).toDateString() : new Date().toDateString()
-};
+    description,
+    duration: Number(duration),
+    date: date ? new Date(date).toDateString() : new Date().toDateString()
+  }
 
-  User.findById(req.params.id, (err, user) => {
-    if(err) return console.error(err);
-    user.log.push(exercise);
+  User.findById(req.params._id, (err, user) => {
+    if (err || !user) return res.status(404).json({ error: 'User not found' })
+    user.log.push(exercise)
     user.save((err, updatedUser) => {
-      if(err) return console.error(err);
+      if (err) return console.error(err)
       res.json({
         _id: updatedUser._id,
         username: updatedUser.username,
         ...exercise
-      });
-    });
-  });
-});
+      })
+    })
+  })
+})
 
+// Get logs
 app.get('/api/users/:_id/logs', (req, res) => {
-  const { from, to, limit } = req.query;
-  User.findById(req.params.id, (err, user) => {
-    if(err) return console.error(err);
-    let log = [...user.log];
+  const { from, to, limit } = req.query
 
-    if (from) log = log.filter(e => new Date(e.date) >= new Date(from));
-    if (to) log = log.filter(e => new Date(e.date) <= new Date(to));
-    if (limit) log = log.slice(0, Number(limit));
+  User.findById(req.params._id, (err, user) => {
+    if (err || !user) return res.status(404).json({ error: 'User not found' })
 
-    log = log.map(e => ({
+    let logs = [...user.log]
+
+    if (from) logs = logs.filter(e => new Date(e.date) >= new Date(from))
+    if (to) logs = logs.filter(e => new Date(e.date) <= new Date(to))
+    if (limit) logs = logs.slice(0, Number(limit))
+
+    logs = logs.map(e => ({
       description: e.description,
       duration: e.duration,
-      date: new Date(e.date).toDateString()
-    }));
+      date: e.date
+    }))
 
     res.json({
       _id: user._id,
       username: user.username,
-      count: log.length,
-      log
-    });
-  });
-});
+      count: logs.length,
+      log: logs
+    })
+  })
+})
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
